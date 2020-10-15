@@ -58,7 +58,23 @@ def weighted_categorical_crossentropy(weights, batch_size=20, IMG_ROW=256, IMG_C
                         (IMG_ROW*IMG_COL*batch_size) / K.sum(non_zero_pixels)
     
     return loss
-    
+
+def per_stand_loss(alpha = 1,beta = 1):
+    def loss(y_true,y_pred):
+        _epsilon = tf.convert_to_tensor(K.epsilon(), dtype=y_pred.dtype.base_dtype)
+        y_pred = tf.clip_by_value(y_pred, _epsilon, 1. - _epsilon) 
+        n_pix = tf.reduce_sum(tf.where(tf.not_equal(y_true, tf.zeros_like(y_true)), tf.ones_like(y_true), tf.zeros_like(y_true)*y_true))
+        prob = tf.reduce_sum(tf.where(tf.equal(tf.clip_by_value(y_pred*2,_epsilon,1), tf.ones_like(y_pred)), tf.ones_like(y_pred), 
+                                      tf.zeros_like(y_pred)*y_pred),[1, 2]) / n_pix
+        part = tf.reduce_sum(y_true, [1, 2]) / n_pix
+        stand_true = tf.reduce_sum(tf.where(tf.not_equal(y_true, tf.zeros_like(y_true)), tf.ones_like(y_true), 
+                                            tf.zeros_like(y_true)*y_true), [1, 2]) / n_pix
+        result = stand_true*(alpha * K.log(prob +_epsilon) + beta * K.log(1 - K.abs(prob - part) + _epsilon)) 
+        return -result * 10
+
+    return loss
+
+
 
 def create_class_weight(labels_dict,mu=0.15):
     total = np.sum(list(labels_dict.values()))
